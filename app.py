@@ -1,8 +1,10 @@
 import os # Permite interagir com o sistema operacional, como acessar variáveis de ambiente
+import re #
 from flask import Flask, request, jsonify # Permite criar a aplicação web, lidar com requisições HTTP e retornar respostas em formato JSON
 import mysql.connector # Permite conectar e interagir com um banco de dados MySQL
 from dotenv import load_dotenv # Permite carregar variáveis de ambiente de um arquivo .env
 from flask_cors import CORS # Permite lidar com requisições de diferentes origens (Cross-Origin Resource Sharing)
+from datetime import datetime # Permite trabalhar com datas e horas
 
 load_dotenv() # Carrega as variáveis de ambiente do arquivo .env
 
@@ -21,23 +23,52 @@ db_config = {
 def get_db_connection():
     return mysql.connector.connect(**db_config) # Função que cria e retorna uma conexão com o banco de dados MySQL usando os parâmetros definidos em db_config
 
+def validar_cpf(cpf: str) -> bool:
+    cpf = ''.join(filter(str.isdigit, cpf))
+    if len(cpf) != 11:
+        return False
+    if cpf == cpf[0] * 11:
+        return False
+    soma_1 = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    resto_1 = (soma_1 * 10) % 11
+    digito_1 = 0 if resto_1 in (10, 11) else resto_1
+    soma_2 = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    resto_2 = (soma_2 * 10) % 11
+    digito_2 = 0 if resto_2 in (10, 11) else resto_2
+    return cpf[-2:] == f"{digito_1}{digito_2}"
+cpf_teste = "123.456.789-09"
+if validar_cpf(cpf_teste):
+    print(f"O CPF {cpf_teste} e valido!")
+else:
+    print(f"O CPF {cpf_teste} e invalido!")
+def formatar_para_twilio(telefone_raw):
+    if not telefone_raw:
+        return ""
+    numeros = re.sub(r'\D', '', str(telefone_raw))
+    if len(numeros) == 11:
+        return f"+55{numeros}"
+    elif len(numeros) == 13:
+        return f"+{numeros}"
+    return numeros
 class Usuarios:
-    def __init__(self, nome, email, cpf, telefone, endereco_usuario, aceitou_lgpd, data_consentimento, id=None):
+    def __init__(self, nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento, id=None):
         self.id = id
         self.nome = nome
         self.email = email
         self.cpf = cpf
+        self.senha = senha
         self.telefone = telefone
         self.endereco_usuario = endereco_usuario
         self.aceitou_lgpd = aceitou_lgpd
         self.data_consentimento = data_consentimento
         
 class Prestadores:
-    def __init__(self, nome, email, cpf, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento, id=None):
+    def __init__(self, nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento, id=None):
         self.id = id
         self.nome = nome
         self.email = email
         self.cpf = cpf
+        self.senha = senha
         self.telefone = telefone
         self.endereco_prestador = endereco_prestador
         self.categoria_servico = categoria_servico
@@ -46,7 +77,7 @@ class Prestadores:
         self.data_consentimento = data_consentimento
         
 class Pedidos:
-    def __init__(self, usuario_id, prestador_id, descricao_servico, valor, data_agendamento, status, data_pedido, id=None):
+    def __init__(self, usuario_id, prestador_id, descricao_servico, valor, data_agendamento, status, id=None):
         self.id = id
         self.usuario_id = usuario_id
         self.prestador_id = prestador_id
@@ -54,8 +85,7 @@ class Pedidos:
         self.valor = valor
         self.data_agendamento = data_agendamento
         self.status = status
-        self.data_pedido = data_pedido
-        
+        self.data_pedido = datetime.now()
 class Avaliacoes:
     def __init__(self, pedido_id, usuario_id, prestador_id, nota, comentario, data_avaliacao, id=None):
         self.id = id
@@ -71,11 +101,11 @@ def cadastrar_usuario():
     conn = None
     try:
         dados = request.get_json()
-        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'], dados['data_consentimento'])
         conn = get_db_connection()
         cursor = conn.cursor()
-        sql = "INSERT INTO usuarios (nome, email, cpf, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento))
+        sql = "INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento))
         conn.commit()
         return jsonify({"message": "Usuário cadastrado com sucesso!"}), 201
     except Exception as e:
@@ -91,11 +121,11 @@ def atualizar_usuario(id):
     conn = None
     try:
         dados = request.get_json()
-        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['telefone'], dados['endereco_usuario'])
+        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'], dados['data_consentimento'])
         conn = get_db_connection()
         cursor = conn.cursor()
-        sql = """UPDATE usuarios SET nome=%s, email=%s, cpf=%s, telefone=%s, endereco_usuario=%s WHERE id=%s"""
-        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.telefone, usuario.endereco_usuario, id))
+        sql = """UPDATE usuarios SET nome=%s, email=%s, cpf=%s, senha=%s, telefone=%s, endereco_usuario=%s, aceitou_lgpd=%s, data_consentimento=%s WHERE id=%s"""
+        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento, id))
         conn.commit()
         if cursor.rowcount == 0: return jsonify({"mensagem": "Usuário não encontrado."}), 404
         return jsonify({"message": "Os dados foram atualizados!"}), 200
@@ -130,11 +160,11 @@ def cadastrar_prestador():
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'], dados['data_consentimento'])
         conn = get_db_connection()
         cursor = conn.cursor()
-        sql = "INSERT INTO prestadores (nome, email, cpf, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento))
+        sql = "INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento))
         conn.commit()
         return jsonify({"message": "Prestador cadastrado com sucesso!"}), 201
     except Exception as e:
@@ -150,11 +180,11 @@ def atualizar_prestador(id):
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'])
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'], dados['data_consentimento'])
         conn = get_db_connection()
         cursor = conn.cursor()
-        sql = """UPDATE prestadores SET nome=%s, email=%s, cpf=%s, telefone=%s, endereco_prestador=%s, categoria_servico=%s, descricao=%s WHERE id=%s"""
-        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, id))
+        sql = """UPDATE prestadores SET nome=%s, email=%s, cpf=%s, senha=%s, telefone=%s, endereco_prestador=%s, categoria_servico=%s, descricao=%s, aceitou_lgpd=%s, data_consentimento=%s WHERE id=%s"""
+        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento, id))
         conn.commit()
         if cursor.rowcount == 0: return jsonify({"mensagem": "Prestador não encontrado."}), 404
         return jsonify({"message": "Os dados foram atualizados!"}), 200
@@ -195,7 +225,7 @@ def buscar_prestadores():
         params = []
         if nome:
             sql += " AND nome LIKE %s"
-            params.append(f"%{nome}%")
+            params.append(f"%{nome}%") #
         cursor.execute(sql, tuple(params))
         prestadores = cursor.fetchall()
         return jsonify(prestadores), 200
@@ -211,7 +241,7 @@ def cadastrar_pedido():
     conn = None
     try:
         dados = request.get_json()
-        pedido = Pedidos(dados['usuario_id'], dados['prestador_id'], dados['descricao_servico'], dados['valor'], dados['data_agendamento'], dados['status'], dados['data_pedido'])
+        pedido = Pedidos(dados['usuario_id'], dados['prestador_id'], dados['descricao_servico'], dados['valor'], dados['data_agendamento'], dados['status'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """INSERT INTO pedidos (usuario_id, prestador_id, descricao_servico, valor, data_agendamento, status, data_pedido) VALUES (%s, %s, %s, %s, %s, %s, %s)"""
@@ -321,4 +351,4 @@ def excluir_avaliacao(id):
             conn.close()
             
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5500) # Inicia a aplicação Flask em modo de depuração, permitindo que erros sejam exibidos no console e que a aplicação seja recarregada automaticamente ao detectar mudanças no código
+    app.run(debug=True, host='0.0.0.0', port=5500)
