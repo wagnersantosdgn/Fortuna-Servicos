@@ -13,7 +13,7 @@ CREATE TABLE usuarios (
     endereco_usuario VARCHAR(255) NOT NULL,
     -- CAMPOS OBRIGATÓRIOS PARA COMPLIANCE COM A LGPD:
     aceitou_lgpd BOOLEAN NOT NULL DEFAULT TRUE,    -- Prova que o cliente marcou a checkbox
-    data_consentimento DATETIME NOT NULL           -- Registro exato de DATA e HORA do aceite
+    data_consentimento TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Registro exato de DATA e HORA do aceite
 );
 
 -- 2. Tabela de Prestadores de Serviço
@@ -29,7 +29,7 @@ CREATE TABLE prestadores (
     descricao TEXT,
 	-- CAMPOS OBRIGATÓRIOS PARA COMPLIANCE COM A LGPD:
     aceitou_lgpd BOOLEAN NOT NULL DEFAULT TRUE,    -- Prova que o cliente marcou a checkbox
-    data_consentimento DATETIME NOT NULL           -- Registro exato de DATA e HORA do aceite
+    data_consentimento TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Registro exato de DATA e HORA do aceite
 );
 
 -- 3. Tabela de Pedidos
