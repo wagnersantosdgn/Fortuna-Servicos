@@ -9,7 +9,8 @@ CREATE TABLE usuarios (
     email VARCHAR(100) NOT NULL UNIQUE,
     cpf VARCHAR(255) NOT NULL UNIQUE, -- Armazenar criptografado (AES-256 / Hash)
     senha VARCHAR(255) NOT NULL,       -- Guardar sempre com hash (ex: bcrypt / argon2)
-    telefone VARCHAR(20) NOT NULL,
+    celular VARCHAR(20) NOT NULL,
+    telefone VARCHAR(20),
     endereco_usuario VARCHAR(255) NOT NULL,
     -- CAMPOS OBRIGATÓRIOS PARA COMPLIANCE COM A LGPD:
     aceitou_lgpd BOOLEAN NOT NULL DEFAULT TRUE,    -- Prova que o cliente marcou a checkbox
@@ -23,7 +24,8 @@ CREATE TABLE prestadores (
     email VARCHAR(100) NOT NULL UNIQUE,
     cpf VARCHAR(255) NOT NULL UNIQUE, -- Armazenar criptografado (AES-256 / Hash)
     senha VARCHAR(255) NOT NULL,       -- Guardar sempre com hash (ex: bcrypt / argon2)
-    telefone VARCHAR(20) NOT NULL,
+    celular VARCHAR(20) NOT NULL,
+    telefone VARCHAR(20),
     endereco_prestador VARCHAR(255) NOT NULL,
     categoria_servico VARCHAR(100) NOT NULL,
     descricao TEXT,
@@ -62,8 +64,8 @@ CREATE TABLE avaliacoes (
     FOREIGN KEY (prestador_id) REFERENCES prestadores(id) ON DELETE CASCADE
 );
 
-INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES ('Ana Souza', 'anasouza@email.com', '244.512.321-23', "0001", "(31) 988432004", "Grau Técnico", TRUE, NOW());
-INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES ('anderson freire', 'andersonfreire@gmail.com', '000.054.000-00', "0002", "(31) 988423005", "senac", "limpeza", "serviço de limpeza residencial e comercial", TRUE, NOW());
+INSERT INTO usuarios (nome, email, cpf, senha, celular, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES ('Ana Souza', 'anasouza@email.com', '244.512.321-23', "0001", "+5531988432004", Null , "Grau Técnico", TRUE, NOW());
+INSERT INTO prestadores (nome, email, cpf, senha, celular, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES ('anderson freire', 'andersonfreire@gmail.com', '000.054.000-00', "0002", "+5531988423005", "(31) 8842-3005" , "senac", "limpeza", "serviço de limpeza residencial e comercial", TRUE, NOW());
 -- Consulta com JOIN para testar
 SELECT
     pedidos.id,

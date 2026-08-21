@@ -36,22 +36,15 @@ def validar_cpf(cpf: str) -> bool:
     resto_2 = (soma_2 * 10) % 11
     digito_2 = 0 if resto_2 in (10, 11) else resto_2
     return cpf[-2:] == f"{digito_1}{digito_2}"
-cpf_teste = "123.456.789-09"
-if validar_cpf(cpf_teste):
-    print(f"O CPF {cpf_teste} e valido!")
-else:
-    print(f"O CPF {cpf_teste} e invalido!")
-def formatar_para_twilio(telefone_raw):
-    if not telefone_raw:
-        return ""
-    numeros = re.sub(r'\D', '', str(telefone_raw))
-    if len(numeros) == 11:
-        return f"+55{numeros}"
-    elif len(numeros) == 13:
-        return f"+{numeros}"
-    return numeros
+def validar_telefone(telefone):
+    telefone_numeros = re.sub(r'\D', '', str(telefone))
+    return len(telefone_numeros) in (10, 11) and telefone_numeros[0] != '0'
 class Usuarios:
-    def __init__(self, nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento, id=None):
+    def __init__(self, nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, id=None):
+        if not validar_cpf(cpf):
+            return jsonify({"erro": "CPF inválido."}), 400
+        if not validar_telefone(telefone):
+            return jsonify({"erro": "Telefone inválido."}), 400
         self.id = id
         self.nome = nome
         self.email = email
@@ -63,7 +56,11 @@ class Usuarios:
         self.data_consentimento = datetime.now()
         
 class Prestadores:
-    def __init__(self, nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento, id=None):
+    def __init__(self, nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, id=None):
+        if not validar_cpf(cpf):
+            return jsonify({"erro": "CPF inválido."}), 400
+        if not validar_telefone(telefone):
+            return jsonify({"erro": "Telefone inválido."}), 400
         self.id = id
         self.nome = nome
         self.email = email
