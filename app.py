@@ -1,5 +1,5 @@
 import os # Permite interagir com o sistema operacional, como acessar variáveis de ambiente
-import re #
+import re # Permite trabalhar com expressões regulares, úteis para validação e formatação de strings
 from flask import Flask, request, jsonify # Permite criar a aplicação web, lidar com requisições HTTP e retornar respostas em formato JSON
 import mysql.connector # Permite conectar e interagir com um banco de dados MySQL
 from dotenv import load_dotenv # Permite carregar variáveis de ambiente de um arquivo .env
@@ -60,7 +60,7 @@ class Usuarios:
         self.telefone = telefone
         self.endereco_usuario = endereco_usuario
         self.aceitou_lgpd = aceitou_lgpd
-        self.data_consentimento = data_consentimento
+        self.data_consentimento = datetime.now()
         
 class Prestadores:
     def __init__(self, nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento, id=None):
@@ -74,7 +74,7 @@ class Prestadores:
         self.categoria_servico = categoria_servico
         self.descricao = descricao
         self.aceitou_lgpd = aceitou_lgpd
-        self.data_consentimento = data_consentimento
+        self.data_consentimento = datetime.now()
         
 class Pedidos:
     def __init__(self, usuario_id, prestador_id, descricao_servico, valor, data_agendamento, status, id=None):
@@ -87,21 +87,21 @@ class Pedidos:
         self.status = status
         self.data_pedido = datetime.now()
 class Avaliacoes:
-    def __init__(self, pedido_id, usuario_id, prestador_id, nota, comentario, data_avaliacao, id=None):
+    def __init__(self, pedido_id, usuario_id, prestador_id, nota, comentario, id=None):
         self.id = id
         self.pedido_id = pedido_id
         self.usuario_id = usuario_id
         self.prestador_id = prestador_id
         self.nota = nota
         self.comentario = comentario
-        self.data_avaliacao = data_avaliacao
+        self.data_avaliacao = datetime.now()
         
 @app.route('/api/usuario', methods=['POST'])
 def cadastrar_usuario():
     conn = None
     try:
         dados = request.get_json()
-        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = "INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
@@ -160,7 +160,7 @@ def cadastrar_prestador():
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = "INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -180,7 +180,7 @@ def atualizar_prestador(id):
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """UPDATE prestadores SET nome=%s, email=%s, cpf=%s, senha=%s, telefone=%s, endereco_prestador=%s, categoria_servico=%s, descricao=%s, aceitou_lgpd=%s, data_consentimento=%s WHERE id=%s"""
@@ -296,7 +296,7 @@ def cadastrar_avaliacao():
     conn = None
     try:
         dados = request.get_json()
-        avaliacao = Avaliacoes(dados['pedido_id'], dados['usuario_id'], dados['prestador_id'], dados['nota'], dados['comentario'], dados['data_avaliacao'])
+        avaliacao = Avaliacoes(dados['pedido_id'], dados['usuario_id'], dados['prestador_id'], dados['nota'], dados['comentario'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """INSERT INTO avaliacoes (pedido_id, usuario_id, prestador_id, nota, comentario, data_avaliacao) VALUES (%s, %s, %s, %s, %s, %s)"""
@@ -316,7 +316,7 @@ def atualizar_avaliacao(id):
     conn = None
     try:
         dados = request.get_json()
-        avaliacao = Avaliacoes(dados['pedido_id'], dados['usuario_id'], dados['prestador_id'], dados['nota'], dados['comentario'], dados['data_avaliacao'])
+        avaliacao = Avaliacoes(dados['pedido_id'], dados['usuario_id'], dados['prestador_id'], dados['nota'], dados['comentario'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """UPDATE avaliacoes SET pedido_id=%s, usuario_id=%s, prestador_id=%s, nota=%s, comentario=%s, data_avaliacao=%s WHERE id=%s"""
