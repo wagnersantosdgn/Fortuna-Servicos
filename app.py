@@ -26,8 +26,8 @@ def get_db_connection():
 # Valida e formata telefones brasileiros para armazenamento e uso em APIs (ex: WhatsApp):
 # - Garante +55 como DDI padrão
 # - Exige DDD (2 dígitos) e número móvel com 9 como primeiro dígito
-# - Aceita entradas como '(31) 98842-3005', '31988423005', '+55 31 98842-3005'
-# Retorna (e164, display) onde e164 é '+55DDDNXXXXXXXX' (sem espaços) e display é '+55 DD NNNNN-NNNN'
+# - Aceita entradas como '(31) 98842-3005', '31988423005', '55 31 98842-3005'
+# Retorna (e164, display) onde e164 é '55DDDNXXXXXXXX' (sem espaços) e display é '55 DD NNNNN-NNNN'
 
 def validate_and_format_phone(phone_str):
     if not phone_str:
