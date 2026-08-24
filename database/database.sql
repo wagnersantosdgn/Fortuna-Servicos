@@ -63,14 +63,32 @@ CREATE TABLE avaliacoes (
     FOREIGN KEY (prestador_id) REFERENCES prestadores(id) ON DELETE CASCADE
 );
 
-INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES ('Ana Souza', 'anasouza@email.com', '244.512.321-23', "0001", "+5531988432004", "Grau Técnico", TRUE, NOW());
-INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES ('anderson freire', 'andersonfreire@gmail.com', '000.054.000-00', "0002", "+5531988423005", "senac", "limpeza", "serviço de limpeza residencial e comercial", TRUE, NOW());
+INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES ('Ana Souza', 'anasouza@email.com', '244.512.321-23', "0001", "5531988432004", "Grau Técnico", TRUE, NOW());
+INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES ('anderson freire', 'andersonfreire@gmail.com', '000.054.000-00', "0002", "5531988423005", "senac", "limpeza", "serviço de limpeza residencial e comercial", TRUE, NOW());
 -- Consulta com JOIN para testar
-SELECT
-    pedidos.id,
-    usuarios.nome AS Usuario,
-    prestadores.nome AS prestador,
-    pedidos.status
-FROM pedidos
-INNER JOIN usuarios ON pedidos.usuario_id = usuarios.id
-INNER JOIN prestadores ON pedidos.prestador_id = prestadores.id;
+-- SELECT
+--     pedidos.id,
+--     usuarios.nome AS Usuario,
+--     prestadores.nome AS prestador,
+--     pedidos.status
+-- FROM pedidos
+-- INNER JOIN usuarios ON pedidos.usuario_id = usuarios.id
+-- INNER JOIN prestadores ON pedidos.prestador_id = prestadores.id;
+
+-- Adiciona um link WhatsApp personalizado para cada prestador
+ALTER TABLE prestadores
+-- O valor é calculado automaticamente pelo MySQL a partir do telefone e do nome
+ADD COLUMN link_whatsapp VARCHAR(255) GENERATED ALWAYS AS (
+    CONCAT(
+        'https://wa.me/',
+        REGEXP_REPLACE(telefone, '[^0-9]', ''),
+        '?text=',
+        REPLACE(
+            CONCAT('Olá,' , nome, ' Gostaria de solicitar seus serviços.'),
+            ' ',
+            '%20'
+        )
+    )
+)
+-- STORED salva o resultado calculado para facilitar os SELECTs
+STORED;
