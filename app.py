@@ -23,28 +23,67 @@ db_config = {
 def get_db_connection():
     return mysql.connector.connect(**db_config) # Função que cria e retorna uma conexão com o banco de dados MySQL usando os parâmetros definidos em db_config
 
-def validar_cpf(cpf: str) -> bool:
-    cpf = ''.join(filter(str.isdigit, cpf))
-    if len(cpf) != 11:
-        return False
-    if cpf == cpf[0] * 11:
-        return False
-    soma_1 = sum(int(cpf[i]) * (10 - i) for i in range(9))
-    resto_1 = (soma_1 * 10) % 11
-    digito_1 = 0 if resto_1 in (10, 11) else resto_1
-    soma_2 = sum(int(cpf[i]) * (11 - i) for i in range(10))
-    resto_2 = (soma_2 * 10) % 11
-    digito_2 = 0 if resto_2 in (10, 11) else resto_2
-    return cpf[-2:] == f"{digito_1}{digito_2}"
-def validar_telefone(telefone):
-    telefone_numeros = re.sub(r'\D', '', str(telefone))
-    return len(telefone_numeros) in (10, 11) and telefone_numeros[0] != '0'
+# Valida e formata telefones brasileiros para armazenamento e uso em APIs (ex: WhatsApp):
+# - Garante +55 como DDI padrão
+# - Exige DDD (2 dígitos) e número móvel com 9 como primeiro dígito
+# - Aceita entradas como '(31) 98842-3005', '31988423005', '+55 31 98842-3005'
+# Retorna (e164, display) onde e164 é '+55DDDNXXXXXXXX' (sem espaços) e display é '+55 DD NNNNN-NNNN'
+
+def validate_and_format_phone(phone_str):
+    if not phone_str:
+        raise ValueError('Telefone é obrigatório.')
+    # Extrai apenas dígitos
+    digits = re.sub(r'\D', '', phone_str)
+    digits = digits.lstrip('0')
+    # Remove código do país se presente
+    if digits.startswith('55'):
+        core = digits[2:]
+    else:
+        core = digits
+    # Se faltar o 9 (número com 8 dígitos após o DDD), insere o 9 como padrão
+    if len(core) == 10:
+        core = core[:2] + '9' + core[2:]
+    if len(core) != 11:
+        raise ValueError('Telefone inválido. Informe DDD + número (ex: (31) 98842-3005).')
+    # Verifica se é número móvel começando com 9
+    if core[2] != '9':
+        raise ValueError('Número móvel inválido: deve começar com 9 (ex: 98842-3005).')
+    e164 = '55' + core
+    display = f'55 {core[:2]} {core[2:7]}-{core[7:]}'
+    return e164, display
+
+
+# Valida e formata CPF (validação completa com dígitos verificadores):
+# - Rejeita sequências repetidas (ex: 00000000000)
+# - Rejeita CPF inválido como 000.000.000-00
+# - Retorna (digits, display) onde digits é apenas os 11 dígitos e display é formatado '000.000.000-00'
+
+def validate_and_format_cpf(cpf_str):
+    if not cpf_str:
+        raise ValueError('CPF é obrigatório.')
+    digits = re.sub(r'\D', '', cpf_str)
+    if len(digits) != 11:
+        raise ValueError('CPF inválido: deve conter 11 dígitos.')
+    # Rejeita sequências repetidas como '00000000000', '11111111111', ...
+    if digits == digits[0] * 11:
+        raise ValueError('CPF inválido.')
+    # Cálculo dos dígitos verificadores
+    def calc_digit(digs):
+        s = 0
+        for i, multiplier in enumerate(range(len(digs)+1, 1, -1)):
+            s += int(digs[i]) * multiplier
+        r = s % 11
+        return '0' if r < 2 else str(11 - r)
+    first_check = calc_digit(digits[:9])
+    second_check = calc_digit(digits[:9] + first_check)
+    if digits[9] != first_check or digits[10] != second_check:
+        raise ValueError('CPF inválido.')
+    display = f'{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}'
+    return digits, display
+
+
 class Usuarios:
     def __init__(self, nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, id=None):
-        if not validar_cpf(cpf):
-            return jsonify({"erro": "CPF inválido."}), 400
-        if not validar_telefone(telefone):
-            return jsonify({"erro": "Telefone inválido."}), 400
         self.id = id
         self.nome = nome
         self.email = email
@@ -57,10 +96,6 @@ class Usuarios:
         
 class Prestadores:
     def __init__(self, nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, id=None):
-        if not validar_cpf(cpf):
-            return jsonify({"erro": "CPF inválido."}), 400
-        if not validar_telefone(telefone):
-            return jsonify({"erro": "Telefone inválido."}), 400
         self.id = id
         self.nome = nome
         self.email = email
@@ -98,11 +133,16 @@ def cadastrar_usuario():
     conn = None
     try:
         dados = request.get_json()
-        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'])
+        try:
+            telefone_e164, telefone_display = validate_and_format_phone(dados.get('telefone', ''))
+            cpf_digits, cpf_display = validate_and_format_cpf(dados.get('cpf', ''))
+        except ValueError as ve:
+            return jsonify({"erro": str(ve)}), 400
+        usuario = Usuarios(dados['nome'], dados['email'], cpf_display, dados['senha'], telefone_e164, dados['endereco_usuario'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = "INSERT INTO usuarios (nome, email, cpf, senha, telefone, endereco_usuario, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento))
+        cursor.execute(sql, (usuario.nome, usuario.email, validate_and_format_cpf(dados.get('cpf', ''))[1], usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento))
         conn.commit()
         return jsonify({"message": "Usuário cadastrado com sucesso!"}), 201
     except Exception as e:
@@ -118,11 +158,16 @@ def atualizar_usuario(id):
     conn = None
     try:
         dados = request.get_json()
-        usuario = Usuarios(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_usuario'], dados['aceitou_lgpd'], dados['data_consentimento'])
+        try:
+            telefone_e164, telefone_display = validate_and_format_phone(dados.get('telefone', ''))
+            cpf_digits, cpf_display = validate_and_format_cpf(dados.get('cpf', ''))
+        except ValueError as ve:
+            return jsonify({"erro": str(ve)}), 400
+        usuario = Usuarios(dados['nome'], dados['email'], cpf_display, dados['senha'], telefone_e164, dados['endereco_usuario'], dados['aceitou_lgpd'], dados.get('data_consentimento'))
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """UPDATE usuarios SET nome=%s, email=%s, cpf=%s, senha=%s, telefone=%s, endereco_usuario=%s, aceitou_lgpd=%s, data_consentimento=%s WHERE id=%s"""
-        cursor.execute(sql, (usuario.nome, usuario.email, usuario.cpf, usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento, id))
+        cursor.execute(sql, (usuario.nome, usuario.email, validate_and_format_cpf(dados.get('cpf', ''))[1], usuario.senha, usuario.telefone, usuario.endereco_usuario, usuario.aceitou_lgpd, usuario.data_consentimento, id))
         conn.commit()
         if cursor.rowcount == 0: return jsonify({"mensagem": "Usuário não encontrado."}), 404
         return jsonify({"message": "Os dados foram atualizados!"}), 200
@@ -157,13 +202,20 @@ def cadastrar_prestador():
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
+        try:
+            telefone_e164, telefone_display = validate_and_format_phone(dados.get('telefone', ''))
+        except ValueError as ve:
+            return jsonify({"erro": str(ve)}), 400
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], telefone_e164, dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = "INSERT INTO prestadores (nome, email, cpf, senha, telefone, endereco_prestador, categoria_servico, descricao, aceitou_lgpd, data_consentimento) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento))
+        cursor.execute(sql, (prestador.nome, prestador.email, validate_and_format_cpf(dados.get('cpf', ''))[1], prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento))
         conn.commit()
         return jsonify({"message": "Prestador cadastrado com sucesso!"}), 201
+    except ValueError as ve:
+        if conn: conn.rollback()
+        return jsonify({"erro": str(ve)}), 400
     except Exception as e:
         if conn: conn.rollback()
         return jsonify({"erro": str(e)}), 500
@@ -177,14 +229,21 @@ def atualizar_prestador(id):
     conn = None
     try:
         dados = request.get_json()
-        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], dados['telefone'], dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
+        try:
+            telefone_e164, telefone_display = validate_and_format_phone(dados.get('telefone', ''))
+        except ValueError as ve:
+            return jsonify({"erro": str(ve)}), 400
+        prestador = Prestadores(dados['nome'], dados['email'], dados['cpf'], dados['senha'], telefone_e164, dados['endereco_prestador'], dados['categoria_servico'], dados['descricao'], dados['aceitou_lgpd'])
         conn = get_db_connection()
         cursor = conn.cursor()
         sql = """UPDATE prestadores SET nome=%s, email=%s, cpf=%s, senha=%s, telefone=%s, endereco_prestador=%s, categoria_servico=%s, descricao=%s, aceitou_lgpd=%s, data_consentimento=%s WHERE id=%s"""
-        cursor.execute(sql, (prestador.nome, prestador.email, prestador.cpf, prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento, id))
+        cursor.execute(sql, (prestador.nome, prestador.email, validate_and_format_cpf(dados.get('cpf', ''))[1], prestador.senha, prestador.telefone, prestador.endereco_prestador, prestador.categoria_servico, prestador.descricao, prestador.aceitou_lgpd, prestador.data_consentimento, id))
         conn.commit()
         if cursor.rowcount == 0: return jsonify({"mensagem": "Prestador não encontrado."}), 404
         return jsonify({"message": "Os dados foram atualizados!"}), 200
+    except ValueError as ve:
+        if conn: conn.rollback()
+        return jsonify({"erro": str(ve)}), 400
     except Exception as e:
         if conn: conn.rollback()
         return jsonify({"erro": str(e)}), 500
