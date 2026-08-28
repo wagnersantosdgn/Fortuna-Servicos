@@ -1,0 +1,42 @@
+# AVALIACOES
+{
+"pedido_id": "2",
+"usuario_id": "3",
+"prestador_id": "3",
+"nota": "5",
+"comentario": "Eu adorei o serviço de limpeza prestado. Nota 10/10 :)"
+}
+
+# PEDIDOS
+{
+"usuario_id": "3",
+"prestador_id": "3",
+"descricao_servico": "Limpeza Residencial",
+"valor": "50.00",
+"data_agendamento": "2026-08-21 08:00:00",
+"status": "Pendente"
+}
+
+# PRESTADOR
+{
+  "nome": "Carlos Silva",
+  "telefone": "11983239444",
+  "categoria_servico": "Eletricista",
+  "email": "carlos@email.com",
+  "cpf": "268.224.856-00",
+  "senha": "5432",
+  "endereco_prestador": "Rua Candido, 696, Moema, São Paulo, SP",
+  "descricao": "Serviços elétricos em geral",
+  "aceitou_lgpd": true
+}
+
+# USUARIO / CLIENTE
+{
+  "nome": "Paulin Bacana",
+  "email": "paulo67@gmail.com",
+  "cpf": "960.781.006-61",
+  "senha": "1234",
+  "telefone": "31940028922",
+  "endereco_usuario": "Rua Amazonas, 2285, Santo Agostinho, Belo Horizonte, MG",
+  "aceitou_lgpd": true
+}
